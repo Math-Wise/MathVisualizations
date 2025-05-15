@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Animated 2x2 Matrix-Vector Visualizer</title>
+    <title>Interactive Matrix Transformation Visualizer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -47,17 +47,16 @@
 
     <div class="bg-white p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-4xl">
         <header class="mb-6 sm:mb-8 text-center">
-            <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Matrix Multiplication Visualizer</h1>
-            <p class="text-sm text-gray-600 mt-1">2x2 Matrix by 2x1 Vector (Basis Vectors Unlabeled)</p>
+            <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Matrix Transformation Visualizer</h1>
+            <p class="text-sm text-gray-600 mt-1">2x2 Matrix Transformation with Animated Vectors & Grid</p>
         </header>
 
-        <!-- Input Section -->
         <div class="flex flex-col lg:flex-row gap-6 sm:gap-8">
             <div class="w-full lg:w-1/3 bg-gray-50 p-6 rounded-lg shadow">
                 <h2 class="text-xl font-semibold text-gray-700 mb-4">Inputs</h2>
 
                 <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Matrix [A]</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Input Matrix A</label>
                     <div class="matrix-grid">
                         <input type="number" id="a11" value="1" class="p-2 border border-gray-300 bg-white text-gray-900 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-center">
                         <input type="number" id="a12" value="0" class="p-2 border border-gray-300 bg-white text-gray-900 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-center">
@@ -67,7 +66,7 @@
                 </div>
 
                 <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Vector [v]</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Input Vector v</label>
                     <div class="vector-grid">
                         <input type="number" id="v1" value="2" class="p-2 border border-gray-300 bg-white text-gray-900 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-center">
                         <input type="number" id="v2" value="3" class="p-2 border border-gray-300 bg-white text-gray-900 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-center">
@@ -79,12 +78,12 @@
                 </button>
 
                 <div id="errorMessage" class="mt-4 text-red-600 text-sm font-medium"></div>
-                <div id="resultDisplay" class="mt-6 text-sm text-gray-700 space-y-2">
-                    {/* Results will be displayed here */}
+                <!--Font size increased here from text-sm to text-base -->
+                <div id="resultDisplay" class="mt-6 text-base text-gray-700 space-y-2">
+                    <!--Results: Original v and A*v will be displayed here only at the end of the animation -->
                 </div>
             </div>
 
-            <!--Canvas Section-->
             <div class="w-full lg:w-2/3 flex justify-center items-center bg-gray-100 p-2 rounded-lg shadow aspect-square lg:aspect-auto">
                  <canvas id="transformationCanvas" class="rounded-md border border-gray-300"></canvas>
             </div>
@@ -117,7 +116,8 @@
         // Animation State
         let animationFrameId = null; 
         let animationStartTime = 0; 
-        const animationDuration = 1500; 
+        const animationDuration = 3000; 
+        let labelPositionsThisFrame = []; 
 
         // Current and target values for animation (world coordinates)
         let current_v1_val, current_v2_val; 
@@ -125,30 +125,31 @@
         let current_a11_val, current_a12_val, current_a21_val, current_a22_val; 
 
         // Basis Vectors (world coordinates)
-        const static_i_hat = { x: 1, y: 0 }; 
-        const static_j_hat = { x: 0, y: 1 }; 
+        const initial_i_hat_coords = { x: 1, y: 0 }; 
+        const initial_j_hat_coords = { x: 0, y: 1 }; 
         let target_transformed_i_hat = { x: 1, y: 0 }; 
         let target_transformed_j_hat = { x: 0, y: 1 }; 
 
         // Colors (Light Mode)
-        const staticGridColor = "#e5e7eb";      // Tailwind gray-200
-        const transformedGridColor = "rgba(59, 130, 246, 0.5)"; // Tailwind blue-500 with opacity
-        const axisColor = "#4b5563";            // Tailwind gray-600
-        const axisLabelColor = "#374151";       // Tailwind gray-700
+        const staticGridColor = "#e5e7eb";      
+        const transformedGridColor = "rgba(59, 130, 246, 0.5)"; 
+        const axisColor = "#4b5563";            
+        const axisLabelColor = "#374151";       
         
-        const mainVectorColor = "rgba(234, 179, 8, 0.9)";    // Tailwind yellow-500
+        const originalMainVectorColor = "rgba(234, 179, 8, 0.9)";    
+        const fadedOriginalMainVectorColor = "rgba(234, 179, 8, 0.45)"; 
+        const transformedMainVectorColor = "rgba(249, 115, 22, 0.9)"; 
         
-        const iHatColor = "rgba(239, 68, 68, 0.9)";       // Tailwind red-500
-        const jHatColor = "rgba(16, 185, 129, 0.9)";     // Tailwind green-500
+        const iHatColor = "rgba(239, 68, 68, 0.9)";       
+        const jHatColor = "rgba(16, 185, 129, 0.9)";     
 
         // Function to setup and resize canvas
         function setupCanvas() {
             const container = canvas.parentElement;
             const containerWidth = container.clientWidth || canvasSize;
             const containerHeight = container.clientHeight || canvasSize;
-            // Adjust available width/height by checking if the container has padding (p-2 class)
             const hasPadding = container.classList.contains('p-2');
-            const paddingValue = hasPadding ? parseFloat(getComputedStyle(container).paddingLeft) * 2 : 0; // Get actual padding if p-2 is used
+            const paddingValue = hasPadding ? parseFloat(getComputedStyle(container).paddingLeft) * 2 : 0;
             
             const availableWidth = containerWidth - paddingValue; 
             const availableHeight = containerHeight - paddingValue;
@@ -157,68 +158,62 @@
             canvas.height = canvasSize;
             originX = canvas.width / 2;
             originY = canvas.height / 2;
-            gridSize = (canvasSize - 2 * canvasPadding) / (2 * visibleUnits); // Calculate gridSize based on visible units and padding
+            gridSize = (canvasSize - 2 * canvasPadding) / (2 * visibleUnits);
 
-            if (!animationFrameId) { // If no animation is running, redraw the static state
+            if (!animationFrameId) {
                 drawStaticState(); 
             }
         }
 
-        // Converts world coordinates (mathematical) to canvas pixel coordinates
+        // Converts world coordinates to canvas pixel coordinates
         function worldToCanvas(worldX, worldY) {
             const canvasX = originX + worldX * gridSize;
-            const canvasY = originY - worldY * gridSize; // Y-axis is inverted in canvas
+            const canvasY = originY - worldY * gridSize; 
             return { x: canvasX, y: canvasY };
         }
         
-        // Converts grid cell coordinates (integer steps) to canvas pixel coordinates using specified basis vectors
+        // Converts grid cell coordinates to canvas pixel coordinates using specified basis vectors
         function mapCellToCanvas(gridCellX, gridCellY, i_basis_world, j_basis_world) {
-            // Calculate world coordinates based on the basis vectors
             const worldX = gridCellX * i_basis_world.x + gridCellY * j_basis_world.x;
             const worldY = gridCellX * i_basis_world.y + gridCellY * j_basis_world.y;
-            return worldToCanvas(worldX, worldY); // Convert these world coordinates to canvas pixels
+            return worldToCanvas(worldX, worldY); 
         }
 
-        // Draws the static background grid and the main X/Y axes
+        // Draws the static background grid and axes
         function drawStaticGridAndAxes() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the canvas
+            labelPositionsThisFrame = []; 
+            ctx.clearRect(0, 0, canvas.width, canvas.height); 
             ctx.strokeStyle = staticGridColor;
             ctx.lineWidth = 0.75; 
 
-            // Draw vertical and horizontal grid lines
             for (let i = -visibleUnits; i <= visibleUnits; i++) {
-                const {x: xPosVertical} = worldToCanvas(i, 0); // Get canvas x-coordinate for vertical line at world x=i
+                const {x: xPosVertical} = worldToCanvas(i, 0); 
                 ctx.beginPath(); ctx.moveTo(xPosVertical, 0); ctx.lineTo(xPosVertical, canvas.height); ctx.stroke();
-                const {y: yPosHorizontal} = worldToCanvas(0, i); // Get canvas y-coordinate for horizontal line at world y=i
+                const {y: yPosHorizontal} = worldToCanvas(0, i); 
                 ctx.beginPath(); ctx.moveTo(0, yPosHorizontal); ctx.lineTo(canvas.width, yPosHorizontal); ctx.stroke();
             }
 
-            // Draw main X and Y axes (thicker and different color)
             ctx.strokeStyle = axisColor;
             ctx.lineWidth = 1.5;
-            const {y: originYCanvas} = worldToCanvas(0,0); // Canvas y-coordinate of the x-axis
-            const {x: originXCanvas} = worldToCanvas(0,0); // Canvas x-coordinate of the y-axis
-            ctx.beginPath(); ctx.moveTo(0, originYCanvas); ctx.lineTo(canvas.width, originYCanvas); ctx.stroke(); // X-axis
-            ctx.beginPath(); ctx.moveTo(originXCanvas, 0); ctx.lineTo(originXCanvas, canvas.height); ctx.stroke(); // Y-axis
+            const {y: originYCanvas} = worldToCanvas(0,0); 
+            const {x: originXCanvas} = worldToCanvas(0,0); 
+            ctx.beginPath(); ctx.moveTo(0, originYCanvas); ctx.lineTo(canvas.width, originYCanvas); ctx.stroke(); 
+            ctx.beginPath(); ctx.moveTo(originXCanvas, 0); ctx.lineTo(originXCanvas, canvas.height); ctx.stroke(); 
 
-            // Draw axis labels (numbers and origin)
             ctx.fillStyle = axisLabelColor;
             ctx.font = "12px Inter"; 
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
 
             for (let i = -visibleUnits; i <= visibleUnits; i++) {
-                if (i === 0) { // Label for the origin (0,0)
+                if (i === 0) { 
                     const {x: originLabelX, y: originLabelY} = worldToCanvas(0,0);
                     ctx.fillText("0", originLabelX - 10, originLabelY + 14); 
                     continue;
                 }
-                // X-axis ticks and labels
                 const {x: xTickPos, y: yTickCanvasOrigin} = worldToCanvas(i, 0); 
-                // Y-axis ticks and labels
                 const {x: xCanvasOriginForYTick, y: yTickPos} = worldToCanvas(0, i); 
 
-                // Only draw labels if they are reasonably within the visible canvas area
                 if (xTickPos > canvasPadding/2 && xTickPos < canvas.width - canvasPadding/2) {
                     ctx.fillText(i.toString(), xTickPos, yTickCanvasOrigin + 14); 
                     ctx.beginPath(); ctx.moveTo(xTickPos, yTickCanvasOrigin - 4); ctx.lineTo(xTickPos, yTickCanvasOrigin + 4); ctx.stroke(); 
@@ -230,32 +225,36 @@
             }
         }
         
-        // Draws the transformed grid lines based on the (potentially animated) basis vectors
+        // Draws the transformed grid lines
         function drawTransformedGridLines(i_basis_world, j_basis_world) {
             ctx.strokeStyle = transformedGridColor;
             ctx.lineWidth = 1;
-            const maxUnitsToDraw = visibleUnits * 1.5; // Draw more lines to ensure coverage during transformations
+            const maxUnitsToDraw = visibleUnits * 1.5; 
 
             for (let gc = -maxUnitsToDraw; gc <= maxUnitsToDraw; gc++) {
-                // Lines parallel to the transformed j_hat vector
                 const p1_vert = mapCellToCanvas(gc, -maxUnitsToDraw, i_basis_world, j_basis_world);
                 const p2_vert = mapCellToCanvas(gc, maxUnitsToDraw, i_basis_world, j_basis_world);
                 ctx.beginPath(); ctx.moveTo(p1_vert.x, p1_vert.y); ctx.lineTo(p2_vert.x, p2_vert.y); ctx.stroke();
 
-                // Lines parallel to the transformed i_hat vector
                 const p1_horiz = mapCellToCanvas(-maxUnitsToDraw, gc, i_basis_world, j_basis_world);
                 const p2_horiz = mapCellToCanvas(maxUnitsToDraw, gc, i_basis_world, j_basis_world);
                 ctx.beginPath(); ctx.moveTo(p1_horiz.x, p1_horiz.y); ctx.lineTo(p2_horiz.x, p2_horiz.y); ctx.stroke();
             }
         }
         
-        // Draws a vector from origin to (worldX, worldY) with an optional label
-        // omitLabel parameter added to control label visibility
-        function drawStandardVector(worldX, worldY, color, label, omitLabel = false) {
-            const { x: canvasTipX, y: canvasTipY } = worldToCanvas(worldX, worldY); // Tip of the vector in canvas coords
-            const { x: canvasOriginX, y: canvasOriginY } = worldToCanvas(0,0); // Origin in canvas coords
+        // Helper function to check if two rectangles overlap
+        function checkRectOverlap(rect1, rect2) {
+            return !(rect1.x + rect1.width < rect2.x ||
+                       rect1.x > rect2.x + rect2.width ||
+                       rect1.y + rect1.height < rect2.y || 
+                       rect1.y > rect2.y + rect2.height);
+        }
 
-            // Draw the vector line
+        // Draws a vector from origin to (worldX, worldY)
+        function drawStandardVector(worldX, worldY, color, label, omitLabel = false) {
+            const { x: canvasTipX, y: canvasTipY } = worldToCanvas(worldX, worldY); 
+            const { x: canvasOriginX, y: canvasOriginY } = worldToCanvas(0,0); 
+
             ctx.beginPath();
             ctx.moveTo(canvasOriginX, canvasOriginY);
             ctx.lineTo(canvasTipX, canvasTipY);
@@ -263,9 +262,8 @@
             ctx.lineWidth = 3;
             ctx.stroke();
 
-            // Draw the arrowhead
             const headLength = 9; 
-            const angle = Math.atan2(canvasTipY - canvasOriginY, canvasTipX - canvasOriginX); // Angle of the vector
+            const angle = Math.atan2(canvasTipY - canvasOriginY, canvasTipX - canvasOriginX); 
             ctx.fillStyle = color;
             ctx.beginPath();
             ctx.moveTo(canvasTipX, canvasTipY);
@@ -274,68 +272,99 @@
             ctx.closePath();
             ctx.fill();
             
-            // Conditionally draw the label
             if (!omitLabel) { 
-                ctx.font = "bold 13px Inter"; 
-                ctx.fillStyle = color; // Label color matches vector color
+                ctx.font = "bold 16px Inter"; // Vector label font size increased to 16px
+                ctx.fillStyle = color; 
                 ctx.textAlign = "left";
-                ctx.textBaseline = "bottom";
-                
-                // Calculate initial label position (offset from arrowhead)
-                let labelOffsetX = 12 * Math.cos(angle); 
-                let labelOffsetY = 12 * Math.sin(angle);
-                let labelX = canvasTipX + labelOffsetX + (labelOffsetX >= 0 ? 5 : -5); 
-                let labelY = canvasTipY + labelOffsetY + (labelOffsetY >= 0 ? 5 : -10);
+                ctx.textBaseline = "alphabetic"; 
 
                 const text = `${label} (${worldX.toFixed(2)}, ${worldY.toFixed(2)})`;
                 const textMetrics = ctx.measureText(text);
-                
-                // Adjust label position to keep it within canvas bounds
-                if (labelX + textMetrics.width > canvas.width - 5) { // If too far right
-                    labelX = canvasTipX - labelOffsetX - 5 - textMetrics.width; 
+                const ascent = textMetrics.actualBoundingBoxAscent || (parseInt(ctx.font) * 0.75); 
+                const descent = textMetrics.actualBoundingBoxDescent || (parseInt(ctx.font) * 0.25);
+                const labelHeight = ascent + descent;
+                const labelWidth = textMetrics.width;
+
+                const positions = [
+                    { dx: 12 * Math.cos(angle) + 7, dy: 12 * Math.sin(angle) - 7, align: "left" },  
+                    { dx: -12 * Math.cos(angle) - 7 - labelWidth, dy: -12 * Math.sin(angle) + 7 + labelHeight, align: "left" }, 
+                    { dx: 12, dy: -12 -labelHeight, align: "left"}, 
+                    { dx: 12, dy: 12 + labelHeight, align: "left"},   
+                    { dx: -12 - labelWidth, dy: -12 -labelHeight, align: "left"}, 
+                    { dx: -12 - labelWidth, dy: 12 + labelHeight, align: "left"},   
+                ];
+
+                let bestPosition = null;
+
+                for (const pos of positions) {
+                    let currentLabelX = canvasTipX + pos.dx;
+                    let currentLabelY = canvasTipY + pos.dy; 
+                    ctx.textAlign = pos.align; 
+
+                    const proposedRect = {
+                        x: currentLabelX,
+                        y: currentLabelY - ascent, 
+                        width: labelWidth,
+                        height: labelHeight + 2 
+                    };
+
+                    let isOverlapping = false;
+                    for (const existingRect of labelPositionsThisFrame) {
+                        if (checkRectOverlap(proposedRect, existingRect)) {
+                            isOverlapping = true;
+                            break;
+                        }
+                    }
+
+                    if (proposedRect.x < 5 || proposedRect.x + proposedRect.width > canvas.width - 5 ||
+                        proposedRect.y < 5 || proposedRect.y + proposedRect.height > canvas.height - 5) {
+                        isOverlapping = true; 
+                    }
+
+                    if (!isOverlapping) {
+                        bestPosition = proposedRect;
+                        ctx.fillText(text, bestPosition.x, currentLabelY); 
+                        labelPositionsThisFrame.push(bestPosition);
+                        break; 
+                    }
                 }
-                if (labelX < 5) { // If too far left
-                     labelX = canvasTipX - labelOffsetX + 5; 
-                     if (worldX < 0 && labelX + textMetrics.width > canvas.width -5) labelX = 5; // Fallback for very left vectors
+
+                if (!bestPosition) { 
+                    const defaultPos = positions[0];
+                    let finalLabelX = canvasTipX + defaultPos.dx;
+                    let finalLabelY = canvasTipY + defaultPos.dy;
+                    ctx.textAlign = defaultPos.align;
+                    ctx.fillText(text, finalLabelX, finalLabelY);
+                     labelPositionsThisFrame.push({
+                        x: finalLabelX, y: finalLabelY - ascent, width: labelWidth, height: labelHeight
+                    });
                 }
-                const ascent = textMetrics.actualBoundingBoxAscent || 10; // Font ascent for vertical positioning
-                if (labelY - ascent < 5) { // If too high
-                    labelY = canvasTipY - labelOffsetY + 10 + ascent; 
-                }
-                if (labelY > canvas.height - 5) { // If too low
-                    labelY = canvasTipY - labelOffsetY - 5; 
-                }
-                ctx.fillText(text, labelX, labelY);
             }
         }
 
-        // Draws the initial state of the visualization (before any transformation)
+        // Draws the initial static state
         function drawStaticState() {
-            const v1 = parseFloat(v1_input.value); // Get current x-component of vector v
-            const v2 = parseFloat(v2_input.value); // Get current y-component of vector v
+            const v1 = parseFloat(v1_input.value); 
+            const v2 = parseFloat(v2_input.value); 
             drawStaticGridAndAxes(); 
             
-            // Draw static basis vectors i_hat and j_hat, omitting their labels
-            drawStandardVector(static_i_hat.x, static_i_hat.y, iHatColor, "i", true); 
-            drawStandardVector(static_j_hat.x, static_j_hat.y, jHatColor, "j", true); 
+            drawStandardVector(initial_i_hat_coords.x, initial_i_hat_coords.y, iHatColor, "i", true); 
+            drawStandardVector(initial_j_hat_coords.x, initial_j_hat_coords.y, jHatColor, "j", true); 
 
-            // Draw the main input vector 'v' if its components are valid numbers
             if (!isNaN(v1) && !isNaN(v2)) {
-                drawStandardVector(v1, v2, mainVectorColor, "v"); // Main vector 'v' still gets a label
+                drawStandardVector(v1, v2, originalMainVectorColor, "v"); 
             }
-            // Display initial message in the result area if no animation is active
             if (!animationFrameId) {
                  resultDisplay.innerHTML = '<p class="text-gray-500">Enter values and click "Visualize Transformation".</p>';
             }
         }
         
-        // Initiates the animation process when the "Visualize Transformation" button is clicked
+        // Initiates the animation
         function startAnimationProcess() {
-            if (animationFrameId) cancelAnimationFrame(animationFrameId); // Stop any existing animation
-            errorMessageDiv.textContent = ''; // Clear any previous error messages
-            resultDisplay.innerHTML = ''; // Clear previous numerical results
+            if (animationFrameId) cancelAnimationFrame(animationFrameId); 
+            errorMessageDiv.textContent = ''; 
+            resultDisplay.innerHTML = ''; 
 
-            // Get current matrix and vector values from input fields
             current_a11_val = parseFloat(a11_input.value);
             current_a12_val = parseFloat(a12_input.value);
             current_a21_val = parseFloat(a21_input.value);
@@ -343,116 +372,95 @@
             current_v1_val = parseFloat(v1_input.value);
             current_v2_val = parseFloat(v2_input.value);
 
-            // Validate all inputs
             if ([current_a11_val, current_a12_val, current_a21_val, current_a22_val, current_v1_val, current_v2_val].some(isNaN)) {
                 errorMessageDiv.textContent = 'Error: All inputs must be valid numbers.';
-                drawStaticState(); // Redraw static state even if there's an error
+                drawStaticState(); 
                 return;
             }
 
-            // Calculate the target transformed vector A*v
             target_resultX = current_a11_val * current_v1_val + current_a12_val * current_v2_val;
             target_resultY = current_a21_val * current_v1_val + current_a22_val * current_v2_val;
 
-            // Calculate the target transformed basis vectors A*i and A*j
             target_transformed_i_hat = { 
-                x: current_a11_val * static_i_hat.x + current_a12_val * static_i_hat.y, 
-                y: current_a21_val * static_i_hat.x + current_a22_val * static_i_hat.y 
+                x: current_a11_val * initial_i_hat_coords.x + current_a12_val * initial_i_hat_coords.y, 
+                y: current_a21_val * initial_i_hat_coords.x + current_a22_val * initial_i_hat_coords.y 
             };
             target_transformed_j_hat = { 
-                x: current_a11_val * static_j_hat.x + current_a12_val * static_j_hat.y, 
-                y: current_a21_val * static_j_hat.x + current_a22_val * static_j_hat.y 
+                x: current_a11_val * initial_j_hat_coords.x + current_a12_val * initial_j_hat_coords.y, 
+                y: current_a21_val * initial_j_hat_coords.x + current_a22_val * initial_j_hat_coords.y 
             };
             
-            animationStartTime = 0; // Reset animation start time
-            animationFrameId = requestAnimationFrame(animateTransformation); // Start the animation loop
+            animationStartTime = 0; 
+            animationFrameId = requestAnimationFrame(animateTransformation); 
         }
 
-        // The main animation loop, called by requestAnimationFrame
+        // Main animation loop
         function animateTransformation(timestamp) {
-            if (!animationStartTime) animationStartTime = timestamp; // Set start time on the first frame
+            if (!animationStartTime) animationStartTime = timestamp; 
             const elapsedTime = timestamp - animationStartTime;
-            let progress = Math.min(elapsedTime / animationDuration, 1); // Calculate animation progress (0 to 1)
-            
-            // Apply an easing function for smoother animation (e.g., ease-out-cubic)
+            let progress = Math.min(elapsedTime / animationDuration, 1); 
             progress = 1 - Math.pow(1 - progress, 3); 
 
-            drawStaticGridAndAxes(); // Redraw the static background grid and axes each frame
+            drawStaticGridAndAxes(); 
 
-            // Draw the original static vectors (i, j, and v) - these remain in their initial positions
-            // Omit labels for i and j
-            drawStandardVector(static_i_hat.x, static_i_hat.y, iHatColor, "i", true);
-            drawStandardVector(static_j_hat.x, static_j_hat.y, jHatColor, "j", true);
             if(!isNaN(current_v1_val) && !isNaN(current_v2_val)) {
-                drawStandardVector(current_v1_val, current_v2_val, mainVectorColor, "v (original)");
+                // Draw original v with FADED opacity during animation
+                drawStandardVector(current_v1_val, current_v2_val, fadedOriginalMainVectorColor, "v");
             }
 
-            // Interpolate the basis vectors for the transforming grid and the animated A*i, A*j vectors
-            const anim_i_x = static_i_hat.x + (target_transformed_i_hat.x - static_i_hat.x) * progress;
-            const anim_i_y = static_i_hat.y + (target_transformed_i_hat.y - static_i_hat.y) * progress;
-            const anim_j_x = static_j_hat.x + (target_transformed_j_hat.x - static_j_hat.x) * progress;
-            const anim_j_y = static_j_hat.y + (target_transformed_j_hat.y - static_j_hat.y) * progress;
+            const anim_i_x = initial_i_hat_coords.x + (target_transformed_i_hat.x - initial_i_hat_coords.x) * progress;
+            const anim_i_y = initial_i_hat_coords.y + (target_transformed_i_hat.y - initial_i_hat_coords.y) * progress;
+            const anim_j_x = initial_j_hat_coords.x + (target_transformed_j_hat.x - initial_j_hat_coords.x) * progress;
+            const anim_j_y = initial_j_hat_coords.y + (target_transformed_j_hat.y - initial_j_hat_coords.y) * progress;
             
-            const animated_i_basis_world = { x: anim_i_x, y: anim_i_y }; // Current world coords of animating A*i
-            const animated_j_basis_world = { x: anim_j_x, y: anim_j_y }; // Current world coords of animating A*j
+            const animated_i_basis_world = { x: anim_i_x, y: anim_i_y }; 
+            const animated_j_basis_world = { x: anim_j_x, y: anim_j_y }; 
             
-            // Draw the transforming grid lines using the animated basis vectors
             drawTransformedGridLines(animated_i_basis_world, animated_j_basis_world); 
 
-            // Draw the animated transformed basis vectors (A*i and A*j), omitting their labels
             drawStandardVector(animated_i_basis_world.x, animated_i_basis_world.y, iHatColor, "A*i", true);
             drawStandardVector(animated_j_basis_world.x, animated_j_basis_world.y, jHatColor, "A*j", true);
 
-            // Interpolate the tip of the main transformed vector (A*v)
-            // It moves from the tip of the original 'v' to the tip of the final 'A*v'
             const animated_Av_tip_x = current_v1_val + (target_resultX - current_v1_val) * progress;
             const animated_Av_tip_y = current_v2_val + (target_resultY - current_v2_val) * progress;
-            // Draw the animated A*v vector (with label)
-            drawStandardVector(animated_Av_tip_x, animated_Av_tip_y, mainVectorColor, progress < 1 ? "A*v (anim)" : "A*v");
+            drawStandardVector(animated_Av_tip_x, animated_Av_tip_y, transformedMainVectorColor, progress < 1 ? "A*v" : "A*v"); 
 
-            // Continue animation if not complete, otherwise finalize
-            if (progress < 1 || elapsedTime < animationDuration) { // Check elapsedTime for easing functions
+            if (progress < 1 || elapsedTime < animationDuration) { 
                 animationFrameId = requestAnimationFrame(animateTransformation);
             } else {
-                animationFrameId = null; // Animation finished
-                // Display final numerical results
+                animationFrameId = null; 
                 resultDisplay.innerHTML = `
-                    <p><span class="font-semibold">Original v:</span> [${current_v1_val}, ${current_v2_val}]<sup>T</sup></p>
-                    <p><span class="font-semibold">Matrix A:</span> 
-                        <span class="font-mono">[${current_a11_val}, ${current_a12_val}; ${current_a21_val}, ${current_a22_val}]</span></p>
-                    <p><span class="font-semibold text-red-500">A*i:</span> [${target_transformed_i_hat.x.toFixed(3)}, ${target_transformed_i_hat.y.toFixed(3)}]<sup>T</sup></p>
-                    <p><span class="font-semibold text-green-500">A*j:</span> [${target_transformed_j_hat.x.toFixed(3)}, ${target_transformed_j_hat.y.toFixed(3)}]<sup>T</sup></p>
-                    <p><span class="font-semibold text-yellow-500">A*v:</span> [${target_resultX.toFixed(3)}, ${target_resultY.toFixed(3)}]<sup>T</sup></p>
+                    <p><span class="font-semibold" style="color: ${originalMainVectorColor};">v = </span> [${current_v1_val.toFixed(3)}, ${current_v2_val.toFixed(3)}]<sup>T</sup></p>
+                    <p><span class="font-semibold" style="color: ${transformedMainVectorColor};">A&times;v = </span> [${target_resultX.toFixed(3)}, ${target_resultY.toFixed(3)}]<sup>T</sup></p>
                 `;
-                // Perform a final static draw to ensure everything is perfectly aligned and labeled correctly
-                drawStaticGridAndAxes();
-                drawStandardVector(static_i_hat.x, static_i_hat.y, iHatColor, "i", true); 
-                drawStandardVector(static_j_hat.x, static_j_hat.y, jHatColor, "j", true); 
+                // Final static draw
+                drawStaticGridAndAxes(); 
+                
                 if(!isNaN(current_v1_val) && !isNaN(current_v2_val)) {
-                     drawStandardVector(current_v1_val, current_v2_val, mainVectorColor, "v (original)"); 
+                     drawStandardVector(current_v1_val, current_v2_val, fadedOriginalMainVectorColor, "v"); 
                 }
-                drawTransformedGridLines(target_transformed_i_hat, target_transformed_j_hat); // Final transformed grid
+                
+                drawTransformedGridLines(target_transformed_i_hat, target_transformed_j_hat); 
                 drawStandardVector(target_transformed_i_hat.x, target_transformed_i_hat.y, iHatColor, "A*i", true); 
                 drawStandardVector(target_transformed_j_hat.x, target_transformed_j_hat.y, jHatColor, "A*j", true); 
-                drawStandardVector(target_resultX, target_resultY, mainVectorColor, "A*v"); 
+                drawStandardVector(target_resultX, target_resultY, transformedMainVectorColor, "A*v"); 
             }
         }
 
         // Event Listeners
         visualizeButton.addEventListener('click', startAnimationProcess);
-        // Add event listeners to all input fields to update the static display if values change while no animation is running
         [a11_input, a12_input, a21_input, a22_input, v1_input, v2_input].forEach(input => {
             input.addEventListener('input', () => {
-                if (!animationFrameId) { // Only update static state if no animation is active
-                    setupCanvas(); // Recalculate canvas sizes and redraw the static state
+                if (!animationFrameId) { 
+                    setupCanvas(); 
                 }
             });
         });
 
-        // Initial setup on window load and resize
         window.addEventListener('load', setupCanvas);
-        window.addEventListener('resize', setupCanvas); // Redraw on window resize to maintain layout
+        window.addEventListener('resize', setupCanvas); 
     </script>
 
 </body>
 </html>
+
