@@ -1,7 +1,11 @@
 <!DOCTYPE html>
-<!-- KaTeX requires the use of the HTML5 doctype. Without it, KaTeX may not render properly -->
-<html>
-  <head>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rational Function Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-rc.1/dist/katex.min.css" integrity="sha384-D+9gmBxUQogRLqvARvNLmA9hS2x//eK1FhVb9PiU86gmcrBrJAQT8okdJ4LMp2uv" crossorigin="anonymous">
 
     <!-- The loading of KaTeX is deferred to speed up page rendering -->
@@ -10,10 +14,368 @@
     <!-- To automatically render math in text elements, include the auto-render extension: -->
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.0-rc.1/dist/contrib/auto-render.min.js" integrity="sha384-yACMu8JWxKzSp/C1YV86pzGiQ/l1YUfE8oPuahJQxzehAjEt2GiQuy/BIvl9KyeF" crossorigin="anonymous"
         onload="renderMathInElement(document.body);"></script>
-  </head>
-  <body>
-      <p>\(x^2 = \sqrt{y}\)</p><br>
-      <p style="color:blue;font-size:25px;">\(\frac {-b\pm\sqrt{b^2 - 4ac}}{2a}\)</P>
-      <p> \(a^2=b^2+c^2\)</p>
-  </body>
+
+    <style>
+        /* Custom scrollbar for webkit browsers */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        .graph-canvas-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        #rational-graph {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        button:disabled {
+            background-color: #9ca3af; /* Tailwind gray-400 */
+            cursor: not-allowed;
+        }
+        #katex-legend-display {
+            font-size: 1.25rem; 
+            padding: 0.5rem 0;
+            text-align: center;
+            min-height: 2.5em; 
+            border-bottom: 1px solid #e5e7eb; /* Tailwind gray-200 */
+            margin-bottom: 1rem;
+            color: #374151; /* Tailwind gray-700 */
+        }
+        .katex-display > .katex {
+            text-align: center !important; 
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+    <div class="container mx-auto p-4 min-h-screen flex flex-col lg:flex-row gap-4">
+
+        <div class="lg:w-1/3 xl:w-1/4 bg-white p-6 rounded-lg shadow-xl space-y-6 overflow-y-auto" style="max-height: 90vh;">
+            <h2 class="text-2xl font-bold text-center text-blue-600">Rational Function Explorer</h2>
+
+            <div>
+                <label for="function-type" class="block text-sm font-medium text-gray-700 mb-1">Select Function Type:</label>
+                <select id="function-type" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <option value="1" selected> \(y = \frac{(x-a)}{(x-b)}\)</option>
+                    <option value="2">(x-a)² / ((x-b)(x-c))</option>
+                    <option value="3">y = (x-a)(x-b) / (x-c)²</option>
+                    <option value="4">y = (x-a)(x-b) / ((x-b)(x-c))</option>
+                    <option value="5">y = (x-a) / ((x-b)(x-c))</option>
+                    <option value="6">y = (x-a)(x-b) / (x-c)</option>
+                </select>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4">
+                <div>
+                    <label for="param-a" class="block text-sm font-medium text-gray-700">Parameter a:</label>
+                    <input type="number" id="param-a" value="1" step="any" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+                <div>
+                    <label for="param-b" class="block text-sm font-medium text-gray-700">Parameter b:</label>
+                    <input type="number" id="param-b" value="2" step="any" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+                <div>
+                    <label for="param-c" class="block text-sm font-medium text-gray-700">Parameter c: <span class="text-xs text-gray-500">(for types 2,3,4,5,6)</span></label>
+                    <input type="number" id="param-c" value="3" step="any" class="mt-1 block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+            </div>
+
+            <button id="graph-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                Graph
+            </button>
+
+            <div class="values-display mt-6 pt-6 border-t border-gray-200 space-y-2">
+                <h3 class="text-lg font-semibold text-gray-800">Live Values:</h3>
+                <p class="text-sm text-gray-600">Current x: <span id="x-value" class="font-mono text-blue-700">-</span></p>
+                <p class="text-sm text-gray-600">Numerator: <span id="numerator-value" class="font-mono text-green-700">-</span></p>
+                <p class="text-sm text-gray-600">Denominator: <span id="denominator-value" class="font-mono text-red-700">-</span></p>
+                <p class="text-sm text-gray-600">f(x): <span id="y-value" class="font-mono text-purple-700">-</span></p>
+            </div>
+        </div>
+
+        <div class="lg:w-2/3 xl:w-3/4 bg-white p-6 rounded-lg shadow-xl flex flex-col">
+            <div id="katex-legend-display">Select parameters and click Graph.</div>
+            <div class="graph-canvas-container flex-grow">
+                <canvas id="rational-graph"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("DOMContentLoaded event fired. Initial check for KaTeX:", typeof window.katex);
+
+            // DOM Element References
+            const functionTypeSelect = document.getElementById('function-type');
+            const paramAInput = document.getElementById('param-a');
+            const paramBInput = document.getElementById('param-b');
+            const paramCInput = document.getElementById('param-c');
+            const graphButton = document.getElementById('graph-button');
+
+            const xValueDisplay = document.getElementById('x-value');
+            const numeratorValueDisplay = document.getElementById('numerator-value');
+            const denominatorValueDisplay = document.getElementById('denominator-value');
+            const yValueDisplay = document.getElementById('y-value');
+            const katexLegendDisplay = document.getElementById('katex-legend-display');
+
+            const canvas = document.getElementById('rational-graph');
+            const ctx = canvas.getContext('2d');
+
+            let chartInstance = null;
+            let animationFrameId = null; 
+
+            const TOLERANCE = 1e-9; 
+            const DRAW_STEP = 0.05;  
+            const ANIMATION_DELAY = 20; 
+            const X_MIN = -10, X_MAX = 10;
+            const Y_MIN = -10, Y_MAX = 10;
+
+            function initializeChart() {
+                if (chartInstance) {
+                    chartInstance.destroy(); 
+                }
+                chartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        datasets: [{
+                            label: 'f(x)', 
+                            data: [], 
+                            borderColor: 'rgb(59, 130, 246)', 
+                            borderWidth: 2,
+                            tension: 0.0, 
+                            fill: false,
+                            pointRadius: 0, 
+                            segment: { 
+                                borderColor: segmentCtx => segmentCtx.p0.skip || segmentCtx.p1.skip ? 'rgba(0,0,0,0)' : undefined,
+                            }
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false, 
+                        scales: {
+                            x: {
+                                type: 'linear', 
+                                min: X_MIN,
+                                max: X_MAX,
+                                title: { display: true, text: 'x-axis', font: {size: 14} },
+                                grid: { 
+                                    color: (context) => (context.tick && context.tick.value === 0) ? 'rgba(0, 0, 0, 0.5)' : 'rgba(200, 200, 200, 0.3)',
+                                    lineWidth: (context) => (context.tick && context.tick.value === 0) ? 1.5 : 1,
+                                }
+                            },
+                            y: {
+                                min: Y_MIN,
+                                max: Y_MAX,
+                                title: { display: true, text: 'y-axis', font: {size: 14} },
+                                grid: { 
+                                     color: (context) => (context.tick && context.tick.value === 0) ? 'rgba(0, 0, 0, 0.5)' : 'rgba(200, 200, 200, 0.3)',
+                                    lineWidth: (context) => (context.tick && context.tick.value === 0) ? 1.5 : 1,
+                                }
+                            }
+                        },
+                        animation: false, 
+                        plugins: {
+                            legend: { 
+                                display: true, 
+                                position: 'top',
+                                labels: { font: { size: 12 } } 
+                            },
+                            tooltip: {
+                                enabled: true, 
+                                mode: 'index',
+                                intersect: false,
+                            }
+                        }
+                    }
+                });
+            }
+
+            function formatParamForKatex(val) {
+                const absValStr = Math.abs(val).toFixed(2);
+                return (val < 0) ? `+ ${absValStr}` : `- ${absValStr}`;
+            }
+
+            function getFunctionKatexString(type, a, b, c) {
+                let katexString = "y = ";
+                const fa = formatParamForKatex(a); 
+                const fb = formatParamForKatex(b);
+                const fc = formatParamForKatex(c);
+                const term = (valStr) => `(x ${valStr})`;
+
+                switch (type) {
+                    case '1': katexString += `\\frac{${term(fa)}}{${term(fb)}}`; break;
+                    case '2': katexString += `\\frac{${term(fa)}^{2}}{${term(fb)}${term(fc)}}`; break;
+                    case '3': katexString += `\\frac{${term(fa)}${term(fb)}}{${term(fc)}^{2}}`; break;
+                    case '4': katexString += `\\frac{${term(fa)}${term(fb)}}{${term(fb)}${term(fc)}}`; break;
+                    case '5': katexString += `\\frac{${term(fa)}}{${term(fb)}${term(fc)}}`; break;
+                    case '6': katexString += `\\frac{${term(fa)}${term(fb)}}{${term(fc)}}`; break;
+                    default:  katexString += "f(x)"; 
+                }
+                return katexString;
+            }
+
+            function calculateFunctionValues(x, a, b, c, type) {
+                let num, den, yPlot, yDisplay;
+                // Calculation logic (same as previous version)
+                switch (type) {
+                    case '1': 
+                        num = x - a; den = x - b;
+                        if (Math.abs(den) < TOLERANCE) { yPlot = null; yDisplay = (Math.abs(num) < TOLERANCE) ? "Indeterminate (0/0)" : "Undefined (Asymptote)"; } 
+                        else { yPlot = num / den; yDisplay = yPlot; }
+                        break;
+                    case '2': 
+                        num = Math.pow(x - a, 2); den = (x - b) * (x - c);
+                        if (Math.abs(den) < TOLERANCE) { yPlot = null; yDisplay = (Math.abs(num) < TOLERANCE) ? "Indeterminate (0/0)" : "Undefined (Asymptote)"; } 
+                        else { yPlot = num / den; yDisplay = yPlot; }
+                        break;
+                    case '3': 
+                        num = (x - a) * (x - b); den = Math.pow(x - c, 2);
+                        if (Math.abs(den) < TOLERANCE) { yPlot = null; yDisplay = (Math.abs(num) < TOLERANCE) ? "Indeterminate (0/0)" : "Undefined (Asymptote)"; } 
+                        else { yPlot = num / den; yDisplay = yPlot; }
+                        break;
+                    case '4': 
+                        num = (x - a) * (x - b); den = (x - b) * (x - c);
+                        if (Math.abs(x - b) < TOLERANCE) { 
+                            yDisplay = "Indeterminate (Hole at x=" + b.toFixed(2) + ")";
+                            let numSimplifiedHole = b - a; let denSimplifiedHole = b - c;
+                            if (Math.abs(denSimplifiedHole) < TOLERANCE) { yPlot = null; yDisplay = (Math.abs(numSimplifiedHole) < TOLERANCE) ? "Indeterminate (0/0 at hole x=" + b.toFixed(2) + ")" : "Undefined (Asymptote at hole x=" + b.toFixed(2) + ")"; } 
+                            else { yPlot = numSimplifiedHole / denSimplifiedHole; }
+                        } else if (Math.abs(x - c) < TOLERANCE) { 
+                            yPlot = null; let numAtC = (c - a) * (c - b); 
+                            yDisplay = (Math.abs(numAtC) < TOLERANCE) ? "Indeterminate (0/0 at x=" + c.toFixed(2) + ")" : "Undefined (Asymptote at x=" + c.toFixed(2) + ")";
+                        } else { 
+                            if (Math.abs(den) < TOLERANCE) { yPlot = null; yDisplay = (Math.abs(num) < TOLERANCE) ? "Indeterminate (0/0)" : "Undefined (Asymptote)"; } 
+                            else { yPlot = num / den; yDisplay = yPlot; }
+                        }
+                        break;
+                    case '5': 
+                        num = x - a; den = (x - b) * (x - c);
+                        if (Math.abs(den) < TOLERANCE) { yPlot = null; yDisplay = (Math.abs(num) < TOLERANCE) ? "Indeterminate (0/0)" : "Undefined (Asymptote)"; } 
+                        else { yPlot = num / den; yDisplay = yPlot; }
+                        break;
+                    case '6': 
+                        num = (x - a) * (x - b); den = x - c;
+                        if (Math.abs(den) < TOLERANCE) { yPlot = null; yDisplay = (Math.abs(num) < TOLERANCE) ? "Indeterminate (0/0)" : "Undefined (Asymptote)"; } 
+                        else { yPlot = num / den; yDisplay = yPlot; }
+                        break;
+                    default: num = 0; den = 1; yPlot = 0; yDisplay = 0;
+                }
+                if (!isFinite(yPlot)) yPlot = null;
+                if (yPlot !== null && yPlot < Y_MIN) yPlot = Y_MIN -1; 
+                if (yPlot !== null && yPlot > Y_MAX) yPlot = Y_MAX +1; 
+                return { num, den, yPlot, yDisplay };
+            }
+
+            /**
+             * Renders a KaTeX string into the specified element.
+             * Includes error handling for KaTeX library availability and rendering errors.
+             * @param {HTMLElement} element - The HTML element to render into.
+             * @param {string} katexString - The KaTeX formatted string.
+             * @param {string} defaultText - Text to display if KaTeX fails.
+             */
+            function renderKatex(element, katexString, defaultText) {
+                if (typeof katex !== 'undefined') {
+                    try {
+                        katex.render(katexString, element, {
+                            throwOnError: false, 
+                            displayMode: true    
+                        });
+                    } catch (e) {
+                        console.error("KaTeX rendering error:", e, "Input string:", katexString);
+                        element.textContent = defaultText + " (KaTeX render error)";
+                    }
+                } else {
+                    // This block is hit if KaTeX global object is not defined
+                    console.error("KaTeX library is not loaded. Attempted to render string:", katexString);
+                    element.textContent = defaultText + " (KaTeX not loaded)";
+                }
+            }
+
+            function animateDrawing() {
+                let currentX = X_MIN;
+                const a = parseFloat(paramAInput.value);
+                const b = parseFloat(paramBInput.value);
+                const c = parseFloat(paramCInput.value);
+                const type = functionTypeSelect.value;
+
+                if (isNaN(a) || isNaN(b) || isNaN(c)) {
+                    alert("Please enter valid numbers for parameters a, b, and c.");
+                    graphButton.disabled = false; 
+                    renderKatex(katexLegendDisplay, "\\text{Error: Invalid parameters.}", "Error: Invalid parameters.");
+                    return;
+                }
+                
+                const katexString = getFunctionKatexString(type, a, b, c);
+                console.log("Generated KaTeX string for animateDrawing:", katexString); 
+                renderKatex(katexLegendDisplay, katexString, "f(x)"); // Update KaTeX display with current function
+                
+                chartInstance.data.datasets[0].data = [];
+                chartInstance.update('none'); 
+                graphButton.disabled = true; 
+
+                function drawStep() {
+                    if (currentX > X_MAX + TOLERANCE) { 
+                        xValueDisplay.textContent = "-";
+                        numeratorValueDisplay.textContent = "-";
+                        denominatorValueDisplay.textContent = "-";
+                        yValueDisplay.textContent = "-";
+                        graphButton.disabled = false; 
+                        return; 
+                    }
+
+                    const values = calculateFunctionValues(currentX, a, b, c, type);
+                    xValueDisplay.textContent = currentX.toFixed(2);
+                    const numStr = values.num.toFixed(3);
+                    const denStr = values.den.toFixed(3);
+                    numeratorValueDisplay.textContent = numStr;
+                    denominatorValueDisplay.textContent = denStr;
+
+                    if (typeof values.yDisplay === 'number') {
+                        yValueDisplay.textContent = `${numStr} / ${denStr} = ${values.yDisplay.toFixed(3)}`;
+                    } else {
+                        yValueDisplay.textContent = `${numStr} / ${denStr} = ${values.yDisplay}`;
+                    }
+                    
+                    chartInstance.data.datasets[0].data.push({ x: currentX, y: values.yPlot });
+                    chartInstance.update('none'); 
+
+                    currentX += DRAW_STEP;
+                    animationFrameId = setTimeout(drawStep, ANIMATION_DELAY); 
+                }
+                drawStep(); 
+            }
+
+            graphButton.addEventListener('click', () => {
+                if (animationFrameId) {
+                    clearTimeout(animationFrameId); 
+                }
+                animateDrawing();
+            });
+            
+            // Initialize Chart.js first
+            initializeChart();
+
+            // Delay initial KaTeX rendering slightly to give the KaTeX script more time to load and execute
+            setTimeout(() => {
+                console.log("Attempting initial KaTeX render (after 100ms delay). KaTeX type:", typeof window.katex);
+                renderKatex(katexLegendDisplay, "y = f(x)", "y = f(x)");
+            }, 100); 
+        });
+    </script>
+</body>
 </html>
